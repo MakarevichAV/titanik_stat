@@ -1,48 +1,51 @@
 import fs from 'node:fs';
+import readline from "node:readline";
 
-fs.readFile('./train.csv', 'utf8', (err, data) => {
+const fileStream = fs.createReadStream('./train.csv', 'utf-8');
+const reader = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity
+})
 
-    const rows = data.split('\n')
-    rows.shift()
-    rows.pop()
-
-    const initialStat = {
-        pasNumber:  {class1: 0, class2: 0, class3: 0},
-        totalFares: {class1: 0, class2: 0, class3: 0,},
-        men:        {survived: 0, nonSurvived: 0},
-        women:      {survived: 0, nonSurvived: 0},
-        children:   {survived: 0, nonSurvived: 0}
+const stat = {
+    pasNumber:  {class1: 0, class2: 0, class3: 0},
+    totalFares: {class1: 0, class2: 0, class3: 0,},
+    men:        {survived: 0, nonSurvived: 0},
+    women:      {survived: 0, nonSurvived: 0},
+    children:   {survived: 0, nonSurvived: 0}
+}
+let isFirstLine = true;
+reader.on('line', (line) => {
+    if (isFirstLine) {
+        isFirstLine = false;
+        return
+    }
+    const pas = line.split(',')
+    switch (+pas[2]) {
+        case 1:
+            stat.pasNumber.class1++
+            stat.totalFares.class1 += +pas[10]
+            break
+        case 2:
+            stat.pasNumber.class2++
+            stat.totalFares.class2 += +pas[10]
+            break
+        case 3:
+            stat.pasNumber.class3++
+            stat.totalFares.class3 += +pas[10]
+            break
     }
 
-    const stat = rows.reduce((acc, row) => {
-        const pas = row.split(',')
-        switch (+pas[2]) {
-            case 1:
-                acc['pasNumber'].class1++
-                acc['totalFares'].class1 += +pas[10]
-                break
-            case 2:
-                acc['pasNumber'].class2++
-                acc['totalFares'].class2 += +pas[10]
-                break
-            case 3:
-                acc['pasNumber'].class3++
-                acc['totalFares'].class3 += +pas[10]
-                break
-        }
+    let group
+    if (+pas[6] < 18) group = 'children'
+    else if (pas[5] === 'male') group = 'men'
+    else group = 'women'
 
-        let group
+    if (+pas[1]) stat[group].survived++
+    else stat[group].nonSurvived++
+})
 
-        if (+pas[6] < 18) group = 'children'
-        else if (pas[5] === 'male') group = 'men'
-        else group = 'women'
-
-        if (+pas[1]) acc[group].survived++
-        else acc[group].nonSurvived++
-
-        return acc
-    }, initialStat)
-
+reader.on('close', () => {
     stat.totalFares.total = stat.totalFares.class1 + stat.totalFares.class2 + stat.totalFares.class3
     stat.avgClass1 = stat.totalFares.class1/stat.pasNumber.class1
     stat.avgClass2 = stat.totalFares.class2/stat.pasNumber.class2
